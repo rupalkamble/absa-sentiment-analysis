@@ -1,0 +1,9 @@
+dataset,polarity,count
+Laptop 2014 Train,conflict,45
+Laptop 2014 Train,negative,866
+Laptop 2014 Train,neutral,460
+Laptop 2014 Train,positive,987
+Restaurant 2014 Train,conflict,91
+Restaurant 2014 Train,negative,805
+Restaurant 2014 Train,neutral,633
+Restaurant 2014 Train,positive,2164
