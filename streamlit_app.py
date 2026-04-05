@@ -27,7 +27,10 @@ import seaborn as sns
 import plotly.graph_objects as go
 import plotly.express as px
 from transformers import BertTokenizerFast, BertForSequenceClassification
-import spacy
+try:
+    import spacy
+except:
+    spacy = None
 import os
 import time
 from collections import defaultdict
@@ -212,12 +215,7 @@ def load_model():
 
 @st.cache_resource
 def load_spacy():
-    """Loads spaCy NLP model for aspect extraction."""
-    try:
-        return spacy.load('en_core_web_sm')
-    except OSError:
-        st.error("spaCy model not found. Run: python -m spacy download en_core_web_sm")
-        return None
+    return None
 
 
 # ============================================================
