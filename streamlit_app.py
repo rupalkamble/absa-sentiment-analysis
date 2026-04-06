@@ -25,7 +25,12 @@ from collections import defaultdict
 
 @st.cache_resource
 def import_heavy_libs():
+    try:
     import torch
+except Exception as e:
+    import streamlit as st
+    st.error(f"Torch import failed: {e}")
+    torch = None
     from transformers import BertTokenizerFast, BertForSequenceClassification
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
