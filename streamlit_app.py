@@ -17,24 +17,25 @@
 #   - Push this file + requirements.txt to GitHub
 #   - Connect repo to Streamlit Cloud or HF Spaces
 # ============================================================
-
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
-import plotly.graph_objects as go
-import plotly.express as px
-import spacy
-
-@st.cache_resource
-def import_torch_and_transformers():
-    import torch
-    from transformers import BertTokenizerFast, BertForSequenceClassification
-    return torch, BertTokenizerFast, BertForSequenceClassification
 import os
 import time
 from collections import defaultdict
+
+@st.cache_resource
+def import_heavy_libs():
+    import torch
+    from transformers import BertTokenizerFast, BertForSequenceClassification
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import seaborn as sns
+    import plotly.graph_objects as go
+    import plotly.express as px
+    import spacy
+    return (torch, BertTokenizerFast, BertForSequenceClassification,
+            plt, mpatches, sns, go, px, spacy)
+
 
 # ============================================================
 # PAGE CONFIG — must be first Streamlit command
@@ -197,7 +198,8 @@ DEMO_REVIEWS = {
 
 @st.cache_resource
 def load_model():
-    torch, BertTokenizerFast, BertForSequenceClassification = import_torch_and_transformers()
+    (torch, BertTokenizerFast, BertForSequenceClassification,
+     plt, mpatches, sns, go, px, spacy) = import_heavy_libs()
 
     DEVICE    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -219,11 +221,12 @@ def load_model():
 
 @st.cache_resource
 def load_spacy():
-    """Loads spaCy NLP model for aspect extraction."""
+    (torch, BertTokenizerFast, BertForSequenceClassification,
+     plt, mpatches, sns, go, px, spacy) = import_heavy_libs()
     try:
         return spacy.load('en_core_web_sm')
     except OSError:
-        st.error("spaCy model not found. Run: python -m spacy download en_core_web_sm")
+        st.error("spaCy model not found.")
         return None
 
 
@@ -423,6 +426,8 @@ def make_attention_heatmap(tokens, attentions, layer=11, head=0):
 # ============================================================
 
 def main():
+    (torch, BertTokenizerFast, BertForSequenceClassification,
+     plt, mpatches, sns, go, px, spacy) = import_heavy_libs()
     # --- Header ---
     st.markdown("""
     <h1 style="color:#e8e8f0; margin-bottom:4px;">
