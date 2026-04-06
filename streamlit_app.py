@@ -19,15 +19,19 @@
 # ============================================================
 
 import streamlit as st
-import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
 import plotly.graph_objects as go
 import plotly.express as px
-from transformers import BertTokenizerFast, BertForSequenceClassification
 import spacy
+
+@st.cache_resource
+def import_torch_and_transformers():
+    import torch
+    from transformers import BertTokenizerFast, BertForSequenceClassification
+    return torch, BertTokenizerFast, BertForSequenceClassification
 import os
 import time
 from collections import defaultdict
@@ -150,7 +154,7 @@ h1, h2, h3 {
 
 LABEL2ID = {'positive': 0, 'neutral': 1, 'negative': 2}
 ID2LABEL  = {v: k for k, v in LABEL2ID.items()}
-DEVICE    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 SENTIMENT_COLORS = {
     'positive': '#00d68f',
@@ -193,7 +197,10 @@ DEMO_REVIEWS = {
 
 @st.cache_resource
 def load_model():
-    """Loads BERT model and tokenizer. Cached across sessions."""
+    torch, BertTokenizerFast, BertForSequenceClassification = import_torch_and_transformers()
+
+    DEVICE    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     if os.path.exists(MODEL_PATH):
         tokenizer = BertTokenizerFast.from_pretrained(MODEL_PATH)
         model     = BertForSequenceClassification.from_pretrained(
@@ -428,7 +435,7 @@ def main():
 
     # --- Load models ---
     with st.spinner("Loading models..."):
-        model, tokenizer, model_source = load_model()
+        model, tokenizer, model_source, DEVICE = load_model()
         nlp = load_spacy()
 
     st.sidebar.markdown(f"""
