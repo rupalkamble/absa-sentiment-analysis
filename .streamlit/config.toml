@@ -4,4 +4,4 @@ port = 8501
 enableCORS = false
 
 [runtime]
-pythonVersion = "3.11"
+pythonVersion = "3.10"
