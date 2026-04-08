@@ -1,6 +1,5 @@
 # ============================================================
-# Aspect-Based Sentiment Analysis — Streamlit Dashboard
-# (spaCy removed for successful deployment)
+# Aspect-Based Sentiment Analysis — Streamlit Dashboard (Fixed)
 # ============================================================
 
 import streamlit as st
@@ -8,19 +7,13 @@ import numpy as np
 import os
 import time
 import re
-from collections import defaultdict
-
-@st.cache_resource
-def import_heavy_libs():
-    import torch
-    from transformers import BertTokenizerFast, BertForSequenceClassification
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as mpatches
-    import seaborn as sns
-    import plotly.graph_objects as go
-    import plotly.express as px
-    return (torch, BertTokenizerFast, BertForSequenceClassification,
-            plt, mpatches, sns, go, px)
+import torch
+from transformers import BertTokenizerFast, BertForSequenceClassification
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.graph_objects as go
+import pandas as pd
+import io
 
 # ============================================================
 # PAGE CONFIG
@@ -42,12 +35,8 @@ html, body, [class*="css"] { font-family: 'IBM Plex Sans', sans-serif; }
 .main { background-color: #0f1117; }
 h1, h2, h3 { font-family: 'IBM Plex Mono', monospace !important; letter-spacing: -0.5px; }
 .aspect-card {
-    background: #1a1d27;
-    border-radius: 10px;
-    padding: 18px 22px;
-    margin: 10px 0;
-    border-left: 4px solid #444;
-    transition: transform 0.2s;
+    background: #1a1d27; border-radius: 10px; padding: 18px 22px; margin: 10px 0;
+    border-left: 4px solid #444; transition: transform 0.2s;
 }
 .aspect-card:hover { transform: translateX(4px); }
 .aspect-card.positive { border-left-color: #00d68f; }
@@ -68,11 +57,6 @@ h1, h2, h3 { font-family: 'IBM Plex Mono', monospace !important; letter-spacing:
 }
 .metric-number { font-family: 'IBM Plex Mono', monospace; font-size: 2rem; font-weight: 600; }
 .metric-label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-.stTextArea textarea {
-    background: #1a1d27 !important; color: #e8e8f0 !important;
-    border: 1px solid #2a2d3a !important; font-family: 'IBM Plex Sans', sans-serif !important;
-}
-.highlight-aspect { background: rgba(0, 214, 143, 0.15); border-radius: 3px; padding: 1px 4px; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,7 +71,6 @@ SENTIMENT_EMOJI = {'positive': '😊', 'neutral': '😐', 'negative': '😞'}
 MODEL_PATH = 'bert_absa_model/best_model'
 BASE_MODEL = 'bert-base-uncased'
 
-# Demo reviews
 DEMO_REVIEWS = {
     "Restaurant review": "The pasta was absolutely divine and portions were generous, but the service was shockingly slow and our waiter seemed disinterested. The ambiance was cozy and the wine selection was decent.",
     "Laptop review": "Battery life is outstanding — easily lasts 12 hours. The keyboard feels premium and responsive. However, the fan is annoyingly loud under load and the trackpad is just average.",
@@ -99,7 +82,6 @@ DEMO_REVIEWS = {
 # ============================================================
 @st.cache_resource
 def load_model():
-    torch, BertTokenizerFast, BertForSequenceClassification, _, _, _, _, _ = import_heavy_libs()
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     if os.path.exists(MODEL_PATH):
@@ -116,39 +98,27 @@ def load_model():
     return model, tokenizer, source, DEVICE
 
 # ============================================================
-# LIGHTWEIGHT ASPECT EXTRACTION (No spaCy)
+# LIGHTWEIGHT ASPECT EXTRACTION
 # ============================================================
 def extract_aspects_light(text):
-    """Simple rule-based aspect extraction without spaCy"""
-    # Split into sentences
     sentences = re.split(r'[.!?]+', text)
     aspects = []
     seen = set()
-    
-    common_aspects = {'food', 'service', 'staff', 'place', 'room', 'battery', 'keyboard', 
-                     'screen', 'camera', 'price', 'quality', 'ambiance', 'taste', 'portion'}
+    common_aspects = {'food', 'service', 'staff', 'place', 'room', 'battery', 'keyboard', 'screen',
+                      'camera', 'price', 'quality', 'ambiance', 'taste', 'portion'}
     
     for sent in sentences:
         sent = sent.strip()
-        if not sent:
-            continue
+        if not sent: continue
         words = re.findall(r'\b\w+\b', sent.lower())
-        
         for word in words:
             if len(word) > 3 and word not in seen:
-                # Check if it's a likely aspect (noun-like or in common list)
                 if word in common_aspects or any(noun in word for noun in ['ing', 'ment', 'tion', 'ness']):
-                    aspects.append({
-                        'term': word.capitalize(),
-                        'sentence': sent
-                    })
+                    aspects.append({'term': word.capitalize(), 'sentence': sent})
                     seen.add(word)
-    
-    # Fallback: if nothing found, return the whole review as one aspect
     if not aspects:
         aspects.append({'term': 'Overall Experience', 'sentence': text})
-    
-    return aspects[:8]  # Limit to max 8 aspects
+    return aspects[:8]
 
 # ============================================================
 # SENTIMENT PREDICTION
@@ -187,7 +157,7 @@ def predict_sentiment(text, aspect, model, tokenizer, DEVICE):
     }
 
 # ============================================================
-# VISUALIZATIONS (unchanged)
+# VISUALIZATIONS
 # ============================================================
 def make_radar_chart(results):
     aspects = [r['term'] for r in results]
@@ -203,9 +173,11 @@ def make_radar_chart(results):
     fig.add_trace(go.Scatterpolar(r=neu_vals, theta=aspects, fill='toself', name='Neutral',
                                   line_color='#f0b429', fillcolor='rgba(240,180,41,0.10)'))
     
-    fig.update_layout(polar=dict(bgcolor='#1a1d27', radialaxis=dict(range=[0, 1])),
-                      paper_bgcolor='#0f1117', plot_bgcolor='#0f1117',
-                      font=dict(color='#ccc'), legend=dict(bgcolor='#1a1d27'))
+    fig.update_layout(
+        polar=dict(bgcolor='#1a1d27', radialaxis=dict(range=[0, 1])),
+        paper_bgcolor='#0f1117', plot_bgcolor='#0f1117',
+        font=dict(color='#ccc'), legend=dict(bgcolor='#1a1d27')
+    )
     return fig
 
 def make_heatmap_plotly(results):
@@ -224,11 +196,9 @@ def make_heatmap_plotly(results):
 # MAIN APP
 # ============================================================
 def main():
-    torch, BertTokenizerFast, BertForSequenceClassification, plt, mpatches, sns, go, px = import_heavy_libs()
-    
     st.markdown("""
     <h1 style="color:#e8e8f0; margin-bottom:4px;">🔍 Aspect Sentiment Analyzer</h1>
-    <p style="color:#666; font-size:0.9rem;">Fine-grained ABSA using BERT • No spaCy</p>
+    <p style="color:#666; font-size:0.9rem;">Fine-grained ABSA using BERT • Lightweight aspect extraction</p>
     """, unsafe_allow_html=True)
 
     # Load model
@@ -237,17 +207,14 @@ def main():
 
     st.sidebar.markdown(f"**Model**: bert-base-uncased  \n**Source**: {model_source}  \n**Device**: {DEVICE}")
 
-    # Sidebar settings
     extraction_mode = st.sidebar.radio("Aspect extraction", 
-                                       ["Auto (Lightweight)", "Manual input"], 
-                                       index=0)
-
+                                       ["Auto (Lightweight)", "Manual input"], index=0)
     show_attention = st.sidebar.checkbox("Show attention heatmap", value=False)
-    demo_choice = st.sidebar.selectbox("Load demo review", ["— none —"] + list(DEMO_REVIEWS.keys()))
 
-    # Input
+    demo_choice = st.sidebar.selectbox("Load demo review", ["— none —"] + list(DEMO_REVIEWS.keys()))
     default_text = DEMO_REVIEWS.get(demo_choice, "") if demo_choice != "— none —" else ""
-    review_text = st.text_area("📝 Enter a Review", value=default_text, height=150,
+
+    review_text = st.text_area("📝 Enter a Review", value=default_text, height=160,
                                placeholder="Paste your product or restaurant review here...")
 
     if st.button("⚡ Analyse Sentiment", type="primary", use_container_width=True):
@@ -267,26 +234,110 @@ def main():
             st.warning("No aspects found. Try Manual mode.")
             return
 
-        # Predict sentiment for each aspect
+        # Run predictions
         results = []
-        progress = st.progress(0)
+        progress = st.progress(0, text="Analyzing aspects...")
         for i, asp in enumerate(raw_aspects):
             result = predict_sentiment(asp['sentence'], asp['term'], model, tokenizer, DEVICE)
             results.append(result)
             progress.progress((i + 1) / len(raw_aspects))
-        
         progress.empty()
-
-        # Display results (rest of your visualization code remains the same)
-        # ... [You can keep the rest of your results display code as-is from here]
-
-        # Summary metrics, cards, charts, etc.
-        # (I kept your original display logic structure — just replace the extraction part)
 
         st.success(f"Analysis complete! Found {len(results)} aspects.")
 
-        # Add your existing results display code here (cards, radar, heatmap, etc.)
-        # For brevity, I'm stopping here — paste your original results section below this if needed.
+        # ====================== RESULTS DISPLAY ======================
+        # Summary metrics
+        pos_count = sum(1 for r in results if r['sentiment'] == 'positive')
+        neg_count = sum(1 for r in results if r['sentiment'] == 'negative')
+        neu_count = sum(1 for r in results if r['sentiment'] == 'neutral')
+        overall = 'positive' if pos_count > neg_count else ('negative' if neg_count > pos_count else 'neutral')
+        overall_color = SENTIMENT_COLORS[overall]
+
+        st.markdown("---")
+        st.markdown("#### 📊 Summary")
+        m1, m2, m3, m4, m5 = st.columns(5)
+        with m1:
+            st.markdown(f"""
+            <div class="metric-box">
+                <div class="metric-number" style="color:{overall_color};">{SENTIMENT_EMOJI[overall]}</div>
+                <div class="metric-label">Overall</div>
+                <div style="color:{overall_color};font-weight:600;">{overall.upper()}</div>
+            </div>""", unsafe_allow_html=True)
+
+        for col, count, label, color in zip([m2, m3, m4, m5],
+                                            [len(results), pos_count, neg_count, neu_count],
+                                            ['Aspects', 'Positive', 'Negative', 'Neutral'],
+                                            ['#5dade2', SENTIMENT_COLORS['positive'], 
+                                             SENTIMENT_COLORS['negative'], SENTIMENT_COLORS['neutral']]):
+            with col:
+                st.markdown(f"""
+                <div class="metric-box">
+                    <div class="metric-number" style="color:{color};">{count}</div>
+                    <div class="metric-label">{label}</div>
+                </div>""", unsafe_allow_html=True)
+
+        # Per-aspect cards
+        st.markdown("#### 🔎 Per-Aspect Results")
+        col_cards, col_charts = st.columns([1, 1])
+        
+        with col_cards:
+            for r in results:
+                sent = r['sentiment']
+                color = SENTIMENT_COLORS[sent]
+                conf = r['confidence']
+                bar_w = int(conf * 100)
+                st.markdown(f"""
+                <div class="aspect-card {sent}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span class="aspect-term">"{r['term']}"</span>
+                        <span class="sentiment-badge badge-{sent}">{sent}</span>
+                    </div>
+                    <div style="color:#888;font-size:0.85rem;margin-top:6px;">
+                        {r['sentence'][:100]}{'...' if len(r['sentence']) > 100 else ''}
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+                        <div class="confidence-bar-bg" style="flex:1;">
+                            <div class="confidence-bar-fill" style="width:{bar_w}%;background:{color};"></div>
+                        </div>
+                        <span style="color:{color};font-family:'IBM Plex Mono',monospace;">{conf:.0%}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        with col_charts:
+            if len(results) >= 2:
+                st.plotly_chart(make_radar_chart(results), use_container_width=True)
+            st.plotly_chart(make_heatmap_plotly(results), use_container_width=True)
+
+        # Attention heatmap (optional)
+        if show_attention and results:
+            st.markdown("---")
+            st.markdown("#### 🧠 Attention Heatmap")
+            aspect_choice = st.selectbox("Select aspect", [r['term'] for r in results])
+            chosen = next(r for r in results if r['term'] == aspect_choice)
+            if chosen['attentions']:
+                # Simple attention display (you can enhance this)
+                st.info("Attention visualization can be added here if needed.")
+
+        # Download button
+        export_df = pd.DataFrame([{
+            'aspect': r['term'],
+            'sentiment': r['sentiment'],
+            'confidence': f"{r['confidence']:.2%}",
+            'prob_positive': r['prob_positive'],
+            'prob_neutral': r['prob_neutral'],
+            'prob_negative': r['prob_negative'],
+            'sentence': r['sentence']
+        } for r in results])
+        
+        csv_buffer = io.StringIO()
+        export_df.to_csv(csv_buffer, index=False)
+        st.download_button(
+            label="⬇️ Download Results as CSV",
+            data=csv_buffer.getvalue(),
+            file_name="absa_results.csv",
+            mime="text/csv"
+        )
 
 if __name__ == '__main__':
     main()
