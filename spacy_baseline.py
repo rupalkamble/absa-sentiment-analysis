@@ -1,29 +1,8 @@
 # ============================================================
 # ABSA — Rule-Based Baseline using spaCy Dependency Parsing
 # ============================================================
-# Why do we need a baseline?
-#
-#   Before claiming BERT is good, we need to ask:
-#   "Good compared to what?"
-#
-#   A rule-based baseline uses hand-crafted linguistic rules
-#   (no learning, no training data) to extract aspects and
-#   assign sentiment. It's simple but surprisingly decent.
-#
-#   If BERT only beats this by 2%, it's not very impressive.
-#   If BERT beats it by 20%, that justifies the complexity.
-#
-# Approach:
-#   1. Parse each sentence with spaCy (POS tags + dependencies)
-#   2. Extract nouns/noun phrases as candidate aspects
-#   3. Find sentiment words linked to each aspect via dependency tree
-#   4. Classify sentiment using a lexicon (SentiWordNet / custom)
-#
-# ============================================================
-# Install:
-#   pip install spacy textblob
-#   python -m spacy download en_core_web_sm
-# ============================================================
+
+
 
 import os
 import xml.etree.ElementTree as ET
@@ -45,8 +24,6 @@ print("✅ spaCy loaded\n")
 # ============================================================
 # STEP 1: Sentiment Lexicon
 # ============================================================
-# A simple positive/negative word list.
-# In real use, you'd use SentiWordNet or VADER.
 
 POSITIVE_WORDS = {
     'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic',
