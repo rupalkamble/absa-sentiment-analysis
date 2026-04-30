@@ -1,9 +1,3 @@
-# ============================================================
-# tests/test_core.py
-# ============================================================
-# Unit tests that run automatically in the CI pipeline.
-# pytest will discover and run all functions starting with test_
-# ============================================================
 
 import sys
 import os
